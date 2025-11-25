@@ -184,5 +184,85 @@ class TestStrategyEngine(unittest.TestCase):
         self.assertEqual(len(memos), 0)
         self.mock_risk_manager.assess_trade_risk.assert_not_called()
 
+    def test_run_strategy_profit_taking(self):
+        """Test strategy engine identifies a profit-taking opportunity and generates a SELL trade/memo."""
+        # Setup a market where we have a profitable position
+        profitable_market_id = "market-profitable"
+        profitable_position = Position(
+            market_id=profitable_market_id, asset="YES", quantity=100.0, cost_basis=0.3
+        )
+        profit_portfolio_state = PortfolioState(
+            cash_balance=1000.0,
+            positions={profitable_market_id: profitable_position}
+        )
+        mock_market_data = MarketData(
+            market_id=profitable_market_id,
+            question="Profitable Question",
+            current_price=0.6, # Significantly higher than cost_basis (0.3)
+            volume_24h=100.0,
+            total_liquidity=1000.0
+        )
+
+        # Mock EV to be neutral to avoid conflicting with profit-taking logic
+        self.strategy_engine._calculate_ev_and_conviction = Mock(return_value=(0.6, 0.8))
+        self.mock_risk_manager.assess_trade_risk.return_value = True
+
+        trades, memos = self.strategy_engine.run_strategy(mock_market_data, profit_portfolio_state)
+
+        self.assertEqual(len(trades), 1)
+        self.assertEqual(len(memos), 1)
+
+        trade = trades[0]
+        memo = memos[0]
+
+        self.assertEqual(trade.action, "SELL")
+        self.assertAlmostEqual(trade.quantity, profitable_position.quantity) # Should sell entire position
+        self.assertEqual(trade.market_id, profitable_market_id)
+
+        self.assertEqual(memo.action, "SELL")
+        self.assertIn("Identified profit-taking opportunity.", memo.rationale)
+        self.assertEqual(memo.market_id, profitable_market_id)
+        self.mock_risk_manager.assess_trade_risk.assert_called_once()
+
+    def test_run_strategy_loss_cutting(self):
+        """Test strategy engine identifies a loss-cutting opportunity and generates a SELL trade/memo."""
+        # Setup a market where we have a losing position
+        losing_market_id = "market-losing"
+        losing_position = Position(
+            market_id=losing_market_id, asset="YES", quantity=100.0, cost_basis=0.8
+        )
+        loss_portfolio_state = PortfolioState(
+            cash_balance=1000.0,
+            positions={losing_market_id: losing_position}
+        )
+        mock_market_data = MarketData(
+            market_id=losing_market_id,
+            question="Losing Question",
+            current_price=0.4, # Significantly lower than cost_basis (0.8)
+            volume_24h=100.0,
+            total_liquidity=1000.0
+        )
+
+        # Mock EV to be neutral to avoid conflicting with loss-cutting logic
+        self.strategy_engine._calculate_ev_and_conviction = Mock(return_value=(0.4, 0.8))
+        self.mock_risk_manager.assess_trade_risk.return_value = True
+
+        trades, memos = self.strategy_engine.run_strategy(mock_market_data, loss_portfolio_state)
+
+        self.assertEqual(len(trades), 1)
+        self.assertEqual(len(memos), 1)
+
+        trade = trades[0]
+        memo = memos[0]
+
+        self.assertEqual(trade.action, "SELL")
+        self.assertAlmostEqual(trade.quantity, losing_position.quantity) # Should sell entire position
+        self.assertEqual(trade.market_id, losing_market_id)
+
+        self.assertEqual(memo.action, "SELL")
+        self.assertIn("Identified loss-cutting opportunity.", memo.rationale)
+        self.assertEqual(memo.market_id, losing_market_id)
+        self.mock_risk_manager.assess_trade_risk.assert_called_once()
+
 if __name__ == '__main__':
     unittest.main()

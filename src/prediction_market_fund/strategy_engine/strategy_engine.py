@@ -58,6 +58,7 @@ class StrategyEngine(IStrategyEngine):
 
         action = "HOLD"
         trade_quantity = 0.0
+        rationale_suffix = "" # Initialize rationale_suffix
 
         if conviction >= self.min_conviction_for_trade:
             if ev > current_price * 1.05: # 5% arbitrage opportunity to buy
@@ -69,12 +70,32 @@ class StrategyEngine(IStrategyEngine):
 
         # Get current position for this market
         current_position = portfolio_state.positions.get(market_id)
+        
+        # STRAT-001: Active Position Management - Profit Taking / Loss Cutting
+        if current_position:
+            profit_threshold = 1.10 # 10% profit margin
+            loss_threshold = 0.90   # 10% loss cut
+            
+            # Calculate current value of held position
+            current_position_value = current_position.quantity * current_price
+            cost_basis_value = current_position.quantity * current_position.cost_basis
 
-        # Modify trade quantity based on current position to actively manage
+            if current_position_value > cost_basis_value * profit_threshold:
+                # Take profit: sell a portion or all of the position
+                action = "SELL"
+                trade_quantity = current_position.quantity # Sell all for simplicity, could be partial
+                rationale_suffix = " Identified profit-taking opportunity."
+            elif current_position_value < cost_basis_value * loss_threshold:
+                # Cut loss: sell a portion or all of the position
+                action = "SELL"
+                trade_quantity = current_position.quantity # Sell all for simplicity, could be partial
+                rationale_suffix = " Identified loss-cutting opportunity."
+            else:
+                rationale_suffix = "" # No specific profit/loss action
+        
+        # Modify trade quantity based on current position to actively manage (existing logic)
         if action == "BUY" and current_position:
             # If we already hold, maybe buy less aggressively or hold
-            # For simplicity, we'll still buy the fixed amount, but in a real scenario
-            # this would be more nuanced based on target position size.
             pass
         elif action == "SELL" and current_position:
             # Ensure we don't try to sell more than we own
@@ -88,6 +109,7 @@ class StrategyEngine(IStrategyEngine):
         elif action == "BUY" and portfolio_state.cash_balance < self.trade_amount_per_decision: # Cannot buy if no cash
              action = "HOLD"
              trade_quantity = 0.0
+
 
         if action != "HOLD" and trade_quantity > 0:
             # Create TradeOrder
@@ -115,7 +137,7 @@ class StrategyEngine(IStrategyEngine):
                     calculated_ev=ev,
                     conviction=conviction,
                     rationale=f"Calculated EV {ev:.2f} with conviction {conviction:.2f}. "
-                              f"Current price {current_price:.2f}. Identified {action} opportunity.",
+                              f"Current price {current_price:.2f}. Identified {action} opportunity.{rationale_suffix}",
                     data_sources=["Mock Market Data", f"Polymarket link for {market_id}"]
                 )
                 investment_memos.append(memo)
