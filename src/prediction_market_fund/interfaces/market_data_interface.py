@@ -4,6 +4,16 @@ from datetime import datetime
 from typing import Dict
 
 @dataclass
+class MarketPriceData:
+    """
+    Represents specific price data for an asset within a prediction market.
+    """
+    market_id: str
+    asset: str  # e.g., "yes", "no", specific outcome name
+    price: float
+    timestamp: datetime
+
+@dataclass
 class MarketData:
     """
     Represents standardized market data for a given prediction market.
@@ -33,3 +43,11 @@ class IMarketDataService(ABC):
         Retrieves current market data for all tracked markets.
         """
         pass
+
+    @abstractmethod
+    def get_market_price(self, market_id: str, asset: str) -> MarketPriceData:
+        """
+        Retrieves the current price for a specific asset within a market.
+        """
+        pass
+

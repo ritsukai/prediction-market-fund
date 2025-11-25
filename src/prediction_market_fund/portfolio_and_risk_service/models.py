@@ -9,11 +9,25 @@ class Outcome(Enum):
 
 @dataclass
 class Position:
-    """Represents a single position held in a prediction market."""
+    """
+    Represents a single position held in a prediction market.
+    
+    Attributes:
+        market_id: The ID of the market.
+        asset: The asset held (e.g., "YES" share).
+        quantity: The amount of the asset held.
+        cost_basis: The average price at which the position was acquired.
+        entry_price: The price at which the position was initially entered.
+        current_price: The most recent market price of the asset.
+        unrealized_pnl: Unrealized Profit and Loss for the position.
+    """
     market_id: str
     asset: str # e.g., "YES" share in a market
     quantity: float
     cost_basis: float # Average price at which the position was acquired
+    entry_price: float = 0.0 # Price at which the position was initially entered
+    current_price: float = 0.0 # Most recent market price of the asset
+    unrealized_pnl: float = 0.0 # Unrealized PnL
 
 @dataclass
 class PortfolioState:
@@ -28,6 +42,12 @@ class PortfolioState:
     cash_balance: float
     positions: Dict[str, Position] = field(default_factory=dict) # market_id -> Position
     total_value: float = 0.0 # Derived, sum of cash and market value of positions
+
+    def has_position(self, market_id: str, asset: str) -> bool:
+        """
+        Checks if the portfolio has an active position for a given market_id and asset.
+        """
+        return any(p.market_id == market_id and p.asset == asset for p in self.positions.values())
 
 @dataclass
 class TradeOrder:
@@ -48,3 +68,4 @@ class TradeOrder:
     quantity: float
     price_limit: Optional[float] # Optional limit price for the order
     timestamp: datetime = field(default_factory=datetime.utcnow)
+
