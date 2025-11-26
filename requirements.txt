@@ -1,0 +1,2 @@
+# For now, this file is empty.
+# In the future, it will contain the application's dependencies.
